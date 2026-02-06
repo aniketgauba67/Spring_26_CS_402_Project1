@@ -1,8 +1,5 @@
 import random
 
-# Global flag to control which mode to use in Part 2 (ECB or CTR)
-MODE = "ECB" # or "CTR"
-
 # Step 1: List all group members' D-numbers (keep the 'D' as required)
 d_numbers = [
     "D02001156",    #Hyeonseo Lee
@@ -301,12 +298,3 @@ for r in range(1, 5):
     d = count_bit_differences(original_trace[r], flipped_trace[r])
     print(f"{r:>5} | {d:>26}")
 
-
-if MODE == "ECB":
-    print("Running in ECB mode.")
-    
-elif MODE == "CTR":
-    print("Running in CTR mode.")
-
-else:
-    print("Invalid MODE. Please set MODE to 'ECB' or 'CTR'.")
