@@ -2,9 +2,8 @@ import random
 
 # Step 1: List all group members' D-numbers (keep the 'D' as required)
 d_numbers = [
-    "D01959347",
-    "D02001156",
-    "D01968637",
+    "D12932087",
+    "D39061508"
 ]
 
 # Step 2: Extract the numeric part of each D-number to determine the seed
