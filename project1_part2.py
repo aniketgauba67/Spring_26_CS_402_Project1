@@ -1,7 +1,15 @@
+# =========================================================
+# Project 1, PART (2): AES-128 Encryption in ECB and CTR Modes
+# Hyeonseo Lee, Thomas Ripley, Aniket Gauba
+# CS 402 - Spring 2026
+# =========================================================
+
 import random
 
+# =========================================================
 # Global flag to control which mode to use in Part 2 (ECB or CTR)
 MODE = "ECB" # or "CTR"
+# =========================================================
 
 # Step 1: List all group members' D-numbers (keep the 'D' as required)
 d_numbers = [
@@ -97,16 +105,15 @@ def state_to_bits(state):
 # ---------------------------------------------------------
 # AES-128 Key Expansion
 # ---------------------------------------------------------
-RCON = [0x00,  # index 0 is unused (for convenience)
-        0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36] # Round constants for key expansion
-
-# rot_word: Rotate a 4-byte word left by one byte
-def rot_word(word):
-    return word[1:] + word[:1]
+RCON = [0x00,0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36] # Round constants for key expansion
 
 # sub_word: Apply the S-box to each byte in a 4-byte word
 def sub_word(word):
     return [SBOX[b] for b in word]
+
+# rot_word: Rotate a 4-byte word left by one byte
+def rot_word(word):
+    return word[1:] + word[:1]
 
 # expand_key_128: Expand a 16-byte AES key into 11 round keys (each 16 bytes)
 def expand_key_128(key_bytes):
@@ -134,9 +141,6 @@ def expand_key_128(key_bytes):
             rk.extend(w[4*r + j])
         round_keys.append(bytes(rk))
     return round_keys
-
-
-
 
 
 # ---------------------------------------------------------
@@ -174,139 +178,73 @@ def add_round_key(state, round_key):
         for c in range(4):
             state[r][c] ^= round_key[r][c]
 
-# ---------------------------------------------------------
-# Build AES state from initialization values
-# ---------------------------------------------------------
 
-# Convert the plaintext bits into 16 bytes
-plaintext_bytes = int(plaintext_bits_128, 2).to_bytes(16, 'big')
-
-# Convert the AES key into 16 bytes
-key_bytes = key.to_bytes(16, 'big')
-
-# Create the initial AES state and round key
-state = bytes_to_state(plaintext_bytes)
-round_keys_bytes = expand_key_128(key_bytes)                 
-round_keys = [bytes_to_state(rk) for rk in round_keys_bytes] 
-
-
-# ---------------------------------------------------------
-# Round 0: Initial AddRoundKey
-# ---------------------------------------------------------
-add_round_key(state, round_keys[0])
-
-
-# ---------------------------------------------------------
-# Rounds 1 through 10: run full AES, print state after Round 4
-# ---------------------------------------------------------
-for r in range(1, 11):
-
-    # Apply SubBytes
-    sub_bytes(state)
-
-    # Apply ShiftRows
-    shift_rows(state)
-
-    # Apply MixColumns for rounds 1–9 only
-    # (AES does not use MixColumns in the final round)
-    if r != 10:
-        mix_columns(state)
-
-    # Apply AddRoundKey
-    add_round_key(state, round_keys[r])
-
-
-    # Print only the state after Round 4
-    if r == 4:
-        print("After Round 4 (bits):")
-        print(state_to_bits(state))
-
-# =========================================================
-# PART (2): Flip plaintext bit 12 and count state differences
-# =========================================================
-
-def encrypt_trace_first4_rounds_bits(plaintext_bits_128, key_int):
-    """
-    Encrypts using the same AES round functions from Part (1)
-    and returns the state (as 128-bit strings) after rounds 1–4.
-    """
-    # Convert inputs to bytes
+# AES_encrypt_block: Encrypts a single 128-bit block using AES-128 and returns the final state as a 128-bit string
+def AES_encrypt_block(plaintext_bits_128, key_int):
+    # Convert the plaintext bits into 16 bytes
     plaintext_bytes = int(plaintext_bits_128, 2).to_bytes(16, 'big')
+
+    # Convert the AES key into 16 bytes
     key_bytes = key_int.to_bytes(16, 'big')
 
-    # Build initial state + round key
+    # Create the initial AES state and round key
     state = bytes_to_state(plaintext_bytes)
-    round_keys_bytes = expand_key_128(key_bytes)
-    round_keys = [bytes_to_state(rk) for rk in round_keys_bytes]
+    round_keys_bytes = expand_key_128(key_bytes)                 
+    round_keys = [bytes_to_state(rk) for rk in round_keys_bytes] 
 
 
-    # Round 0 (initial AddRoundKey) — we don't compare round 0 in Part (2)
     add_round_key(state, round_keys[0])
 
+    for r in range(1, 11):
 
-    # Store states after rounds 1–4
-    trace = {}
-
-    for r in range(1, 5):
+        # Apply SubBytes
         sub_bytes(state)
+
+        # Apply ShiftRows
         shift_rows(state)
-        mix_columns(state)
+
+        # Apply MixColumns for rounds 1–9 only
+        # (AES does not use MixColumns in the final round)
+        if r != 10:
+            mix_columns(state)
+
+        # Apply AddRoundKey
         add_round_key(state, round_keys[r])
-        trace[r] = state_to_bits(state)  # 128-bit binary string
 
-    return trace
-
-
-def flip_bit(bitstring, bit_index):
-    """
-    Flips one bit in a binary string.
-    bit_index is 0-based from the left (MSB side).
-    """
-    bits = list(bitstring)
-    bits[bit_index] = '1' if bits[bit_index] == '0' else '0'
-    return ''.join(bits)
+    return state_to_bits(state)
 
 
-def count_bit_differences(a, b):
-    """Counts how many bit positions differ between two same-length bitstrings."""
-    diff = 0
-    for i in range(len(a)):
-        if a[i] != b[i]:
-            diff += 1
-    return diff
+def ECB_encrypt_first_256_bits(plaintext_bits_128, key_int):
+    block1 = message_bits_256[0:128]  # First 128 bits (first block)
+    block2 = message_bits_256[128:256] # Next 128 bits (second block)
+
+    c1 = AES_encrypt_block(block1, key_int)
+    c2 = AES_encrypt_block(block2, key_int)
+
+    return c1 + c2
 
 
-# -----------------------------
-# (2a) Get trace for original plaintext (Part 1)
-# -----------------------------
-original_trace = encrypt_trace_first4_rounds_bits(plaintext_bits_128, key)
-
-# -----------------------------
-# (2b) Flip AES bit 12 of the message
-# Bit numbering: leftmost bit = 0, so bit 12 is index 12
-# -----------------------------
-flipped_plaintext_bits_128 = flip_bit(plaintext_bits_128, 12)
-
-# Encrypt again and trace rounds 1–4
-flipped_trace = encrypt_trace_first4_rounds_bits(flipped_plaintext_bits_128, key)
-
-# -----------------------------
-# (2c) Compare round-by-round and count how many bits differ
-# -----------------------------
-print("\nPart (2): Bit differences after flipping plaintext bit 12\n")
-print("Round | # bits different (out of 128)")
-print("------+----------------------------")
-
-for r in range(1, 5):
-    d = count_bit_differences(original_trace[r], flipped_trace[r])
-    print(f"{r:>5} | {d:>26}")
-
-
-if MODE == "ECB":
-    print("Running in ECB mode.")
+def CTR_encrypt_first_256_bits(plaintext_bits_128, key_int):
+    return 0
     
-elif MODE == "CTR":
-    print("Running in CTR mode.")
 
-else:
-    print("Invalid MODE. Please set MODE to 'ECB' or 'CTR'.")
+
+
+
+
+
+if __name__ == "__main__":
+
+    MESSAGE = "All Denison students should take CS402!"
+    message_bits = text_to_bits(MESSAGE) 
+
+    message_bits_256 = (message_bits + "0"*256)[:256]  # Take the first 256 bits of the message
+
+    if MODE == "ECB":
+        ECB_256_result = ECB_encrypt_first_256_bits(message_bits_256, key)
+        print(ECB_256_result)
+        print("Length of ECB_256_result in bits: ", len(ECB_256_result))  # Should be 256 bits (64 hex characters)
+    elif MODE == "CTR":
+        print("Running in CTR mode.")
+    else:
+        print("Invalid MODE. Please set MODE to 'ECB' or 'CTR'.")
