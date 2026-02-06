@@ -92,6 +92,51 @@ def state_to_bits(state):
     return bits
 
 # ---------------------------------------------------------
+# AES-128 Key Expansion
+# ---------------------------------------------------------
+RCON = [0x00,  # index 0 is unused (for convenience)
+        0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36] # Round constants for key expansion
+
+# rot_word: Rotate a 4-byte word left by one byte
+def rot_word(word):
+    return word[1:] + word[:1]
+
+# sub_word: Apply the S-box to each byte in a 4-byte word
+def sub_word(word):
+    return [SBOX[b] for b in word]
+
+# expand_key_128: Expand a 16-byte AES key into 11 round keys (each 16 bytes)
+def expand_key_128(key_bytes):
+    # Split key into 4 words (each word = 4 bytes)
+    w = []
+    for i in range(4):
+        w.append([key_bytes[4*i], key_bytes[4*i+1], key_bytes[4*i+2], key_bytes[4*i+3]])
+
+    # Generate total 44 words for AES-128
+    for i in range(4, 44):
+        temp = w[i - 1].copy()
+        if i % 4 == 0:
+            temp = rot_word(temp)
+            temp = sub_word(temp)
+            temp[0] ^= RCON[i // 4] # which round constant to use based on i
+
+        # w[i] = w[i-4] XOR temp
+        w.append([w[i - 4][j] ^ temp[j] for j in range(4)])
+
+    # Pack words into 11 round keys (16 bytes each)
+    round_keys = []
+    for r in range(11):
+        rk = []
+        for j in range(4):
+            rk.extend(w[4*r + j])
+        round_keys.append(bytes(rk))
+    return round_keys
+
+
+
+
+
+# ---------------------------------------------------------
 # AES round operations
 # ---------------------------------------------------------
 
@@ -138,12 +183,15 @@ key_bytes = key.to_bytes(16, 'big')
 
 # Create the initial AES state and round key
 state = bytes_to_state(plaintext_bytes)
-round_key = bytes_to_state(key_bytes)
+round_keys_bytes = expand_key_128(key_bytes)                 
+round_keys = [bytes_to_state(rk) for rk in round_keys_bytes] 
+
 
 # ---------------------------------------------------------
 # Round 0: Initial AddRoundKey
 # ---------------------------------------------------------
-add_round_key(state, round_key)
+add_round_key(state, round_keys[0])
+
 
 # ---------------------------------------------------------
 # Rounds 1 through 10: run full AES, print state after Round 4
@@ -162,7 +210,8 @@ for r in range(1, 11):
         mix_columns(state)
 
     # Apply AddRoundKey
-    add_round_key(state, round_key)
+    add_round_key(state, round_keys[r])
+
 
     # Print only the state after Round 4
     if r == 4:
@@ -184,10 +233,13 @@ def encrypt_trace_first4_rounds_bits(plaintext_bits_128, key_int):
 
     # Build initial state + round key
     state = bytes_to_state(plaintext_bytes)
-    round_key = bytes_to_state(key_bytes)
+    round_keys_bytes = expand_key_128(key_bytes)
+    round_keys = [bytes_to_state(rk) for rk in round_keys_bytes]
+
 
     # Round 0 (initial AddRoundKey) — we don't compare round 0 in Part (2)
-    add_round_key(state, round_key)
+    add_round_key(state, round_keys[0])
+
 
     # Store states after rounds 1–4
     trace = {}
@@ -196,7 +248,7 @@ def encrypt_trace_first4_rounds_bits(plaintext_bits_128, key_int):
         sub_bytes(state)
         shift_rows(state)
         mix_columns(state)
-        add_round_key(state, round_key)
+        add_round_key(state, round_keys[r])
         trace[r] = state_to_bits(state)  # 128-bit binary string
 
     return trace
